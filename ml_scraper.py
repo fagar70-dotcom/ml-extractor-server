@@ -6,25 +6,17 @@ No usa la API — lee directamente la página pública, igual que lo vería
 cualquier visitante o Google. Puede romperse si ML cambia el diseño del HTML.
 """
 import json
+try:
+    from scrapling.fetchers import Fetcher
+    _HAS_SCRAPLING = True
+except Exception:
+    _HAS_SCRAPLING = False
 import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate",
     "Referer": "https://www.mercadolibre.com.ar/",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Ch-Ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
 }
 
 _session = None
@@ -35,23 +27,30 @@ def _get_session():
     if _session is None:
         s = requests.Session()
         s.headers.update(HEADERS)
-        try:
-            s.get("https://www.mercadolibre.com.ar/", timeout=15)
-        except requests.RequestException:
-            pass
         _session = s
     return _session
 
 
-def fetch_html(url):
-    session = _get_session()
-    r = session.get(url, timeout=20, allow_redirects=True)
-    r.raise_for_status()
-    if "Verificación de seguridad" in r.text or "/security-check" in r.url:
+def _check_blocked(html, final_url):
+    if "abuse-captcha" in html or "Verificación de seguridad" in html or "security-check" in (final_url or ""):
         raise RuntimeError(
             "Mercado Libre mostró una pantalla de verificación de seguridad "
             "en vez de la publicación (bloqueo anti-bot)."
         )
+
+
+def fetch_html(url):
+    if _HAS_SCRAPLING:
+        page = Fetcher.get(url, stealthy_headers=True, impersonate="chrome")
+        body = page.body if hasattr(page, "body") else b""
+        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+        _check_blocked(html, getattr(page, "url", url))
+        return html
+    # fallback sin scrapling
+    session = _get_session()
+    r = session.get(url, timeout=20, allow_redirects=True)
+    r.raise_for_status()
+    _check_blocked(r.text, r.url)
     return r.text
 
 
