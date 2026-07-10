@@ -71,6 +71,7 @@ def search_ids(query, site, limit):
 
 def fetch_items(ids):
     items = []
+    errors = []
     for batch in chunked(ids, 20):
         r = requests.get(
             f"{API}/items", params={"ids": ",".join(batch)}, headers=auth_headers(), timeout=20
@@ -79,8 +80,11 @@ def fetch_items(ids):
         for entry in r.json():
             if entry.get("code") == 200:
                 items.append(entry["body"])
+            else:
+                body = entry.get("body", {})
+                errors.append(f"{body.get('id', '?')}: {body.get('message') or body}")
         time.sleep(0.15)
-    return items
+    return items, errors
 
 
 def fetch_description(item_id):
@@ -201,6 +205,7 @@ def extract(ids=None, refs=None, search=None, site="MLA", limit=20):
     if not all_ids:
         return [], warnings + ["No se encontraron IDs para procesar."]
 
-    items = fetch_items(all_ids)
+    items, item_errors = fetch_items(all_ids)
+    warnings = warnings + item_errors
     rows = [build_row(item) for item in items]
     return rows, warnings
