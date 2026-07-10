@@ -5,9 +5,15 @@ Usada por app.py (servidor Flask).
 import re
 import time
 import requests
+import ml_auth
 
 API = "https://api.mercadolibre.com"
 HEADERS = {"User-Agent": "Mozilla/5.0 (ML-extractor)"}
+
+
+def auth_headers():
+    token = ml_auth.get_valid_access_token()
+    return {**HEADERS, "Authorization": f"Bearer {token}"}
 
 ID_RE = re.compile(r"(MLA|MLM|MLB|MLC|MCO|MLU|MPE|MEC|MLV)-?(\d+)")
 
@@ -47,7 +53,7 @@ def search_ids(query, site, limit):
         r = requests.get(
             f"{API}/sites/{site}/search",
             params={"q": query, "limit": page_limit, "offset": offset},
-            headers=HEADERS,
+            headers=auth_headers(),
             timeout=20,
         )
         r.raise_for_status()
@@ -67,7 +73,7 @@ def fetch_items(ids):
     items = []
     for batch in chunked(ids, 20):
         r = requests.get(
-            f"{API}/items", params={"ids": ",".join(batch)}, headers=HEADERS, timeout=20
+            f"{API}/items", params={"ids": ",".join(batch)}, headers=auth_headers(), timeout=20
         )
         r.raise_for_status()
         for entry in r.json():
@@ -79,7 +85,7 @@ def fetch_items(ids):
 
 def fetch_description(item_id):
     try:
-        r = requests.get(f"{API}/items/{item_id}/description", headers=HEADERS, timeout=15)
+        r = requests.get(f"{API}/items/{item_id}/description", headers=auth_headers(), timeout=15)
         if r.status_code == 200:
             data = r.json()
             return (data.get("plain_text") or data.get("text") or "").strip()

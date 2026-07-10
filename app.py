@@ -6,8 +6,9 @@ Endpoints:
   GET  /health
   POST /extraer   body JSON: {"ids": [...], "refs": [...], "search": "...", "site": "MLA", "limit": 20}
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 import ml_core
+import ml_auth
 
 app = Flask(__name__)
 
@@ -15,6 +16,28 @@ app = Flask(__name__)
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.get("/oauth/start")
+def oauth_start():
+    if not ml_auth.REDIRECT_URI:
+        return jsonify({"error": "Falta RENDER_EXTERNAL_URL / configuración"}), 500
+    return redirect(ml_auth.authorization_url())
+
+
+@app.get("/oauth/callback")
+def oauth_callback():
+    code = request.args.get("code")
+    error = request.args.get("error")
+    if error:
+        return f"Error de autorización: {error}", 400
+    if not code:
+        return "Falta el parámetro 'code'.", 400
+    try:
+        ml_auth.exchange_code(code)
+    except Exception as e:
+        return f"Error al intercambiar el código: {e}", 500
+    return "Autorización completada con éxito. Ya podés cerrar esta pestaña y volver al chat."
 
 
 @app.route("/extraer", methods=["GET", "POST"])
