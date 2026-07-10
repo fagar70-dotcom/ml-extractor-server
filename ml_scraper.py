@@ -14,13 +14,44 @@ HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "es-AR,es;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer": "https://www.mercadolibre.com.ar/",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Ch-Ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
 }
+
+_session = None
+
+
+def _get_session():
+    global _session
+    if _session is None:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        try:
+            s.get("https://www.mercadolibre.com.ar/", timeout=15)
+        except requests.RequestException:
+            pass
+        _session = s
+    return _session
 
 
 def fetch_html(url):
-    r = requests.get(url, headers=HEADERS, timeout=20, allow_redirects=True)
+    session = _get_session()
+    r = session.get(url, timeout=20, allow_redirects=True)
     r.raise_for_status()
+    if "Verificación de seguridad" in r.text or "/security-check" in r.url:
+        raise RuntimeError(
+            "Mercado Libre mostró una pantalla de verificación de seguridad "
+            "en vez de la publicación (bloqueo anti-bot)."
+        )
     return r.text
 
 
