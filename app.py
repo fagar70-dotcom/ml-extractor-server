@@ -17,14 +17,22 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.post("/extraer")
+@app.route("/extraer", methods=["GET", "POST"])
 def extraer():
-    data = request.get_json(force=True, silent=True) or {}
-    ids = data.get("ids") or []
-    refs = data.get("refs") or []
-    search = data.get("search")
-    site = data.get("site", "MLA")
-    limit = int(data.get("limit", 20))
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        ids = data.get("ids") or []
+        refs = data.get("refs") or []
+        search = data.get("search")
+        site = data.get("site", "MLA")
+        limit = int(data.get("limit", 20))
+    else:
+        args = request.args
+        ids = [i for i in args.get("ids", "").split(",") if i]
+        refs = [r for r in args.get("refs", "").split(",") if r]
+        search = args.get("search")
+        site = args.get("site", "MLA")
+        limit = int(args.get("limit", 20))
 
     if not ids and not refs and not search:
         return jsonify({"error": "Mandá 'ids', 'refs' y/o 'search'."}), 400
