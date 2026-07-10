@@ -9,6 +9,7 @@ Endpoints:
 from flask import Flask, request, jsonify, redirect
 import ml_core
 import ml_auth
+import ml_scraper
 
 app = Flask(__name__)
 
@@ -16,6 +17,26 @@ app = Flask(__name__)
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.route("/scrapear", methods=["GET", "POST"])
+def scrapear():
+    """Para publicaciones de terceros/competencia: lee el HTML público, no usa la API."""
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        urls = data.get("urls") or []
+    else:
+        urls = [u for u in request.args.get("urls", "").split(",") if u]
+
+    if not urls:
+        return jsonify({"error": "Mandá 'urls' (una o varias, separadas por coma)."}), 400
+
+    try:
+        rows, warnings = ml_scraper.scrape(urls)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"rows": rows, "warnings": warnings, "count": len(rows)})
 
 
 @app.get("/oauth/start")
