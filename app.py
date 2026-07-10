@@ -19,7 +19,23 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/scrapear", methods=["GET", "POST"])
+@app.get("/debug_html")
+def debug_html():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "falta url"}), 400
+    try:
+        html = ml_scraper.fetch_html(url)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    return jsonify({
+        "title": soup.title.string if soup.title else None,
+        "len_html": len(html),
+        "has_jsonld": bool(soup.find_all("script", type="application/ld+json")),
+        "primeros_500": html[:500],
+    })
 def scrapear():
     """Para publicaciones de terceros/competencia: lee el HTML público, no usa la API."""
     if request.method == "POST":
